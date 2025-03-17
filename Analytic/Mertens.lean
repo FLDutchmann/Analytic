@@ -8,7 +8,9 @@ import Mathlib
 import Analytic.Mathlib.MeasureTheory.Integral.Asymptotics
 import Analytic.Mathlib.MeasureTheory.Integral.SetIntegral
 import Analytic.Mathlib.NumberTheory.AbelSummation
+import Analytic.Mathlib.NumberTheory.ArithmeticFunction
 import Analytic.Mathlib.Analysis.Asymptotics.Defs
+import Analytic.Mathlib.Analysis.Asymptotics.SpecificAsymptotics
 import Analytic.ForMathlib.EquivalentLogExp
 
 open Filter Nat Real Finset
@@ -22,65 +24,10 @@ section fun_prop
 attribute [fun_prop] measurable_log Measurable.aestronglyMeasurable
 end fun_prop
 
-section MeasureTheory
-variable {α : Type*} {E : Type*} {F : Type*} [TopologicalSpace α] [Norm E] [Norm F]
-
-def Asymptotics.IsLocallyBigO  (l : Filter α) (f : α → E) (g : α → F) :
-  Prop :=
-  ∀ᶠ x in l, f =O[l ⊓ (nhds x)] g
-
-example (f : α → E) (g : α → F) (l : Filter α) (h : f =O[cocompact α] g) (h' : IsLocallyBigO ⊤ f g) :
-  f =O[⊤] g := by
-  obtain ⟨c, h⟩ := h.isBigOWith
-  rw [IsBigOWith, Filter.Eventually, mem_cocompact] at h
-  obtain ⟨t, ht, htc⟩ := h
-  rw [IsLocallyBigO] at h'
-  simp only [le_top, inf_of_le_right, eventually_top, ]  at h'
-  simp only [IsBigO, IsBigOWith, Filter.eventually_iff_exists_mem] at h'
-  choose C h using h'
-  choose U hU hU' using h
-  obtain ⟨s, hs, ht_sub⟩ := ht.elim_nhds_subcover U (fun x _ ↦ hU x)
-  by_cases hs_empty : s = ∅
-  · simp_all
-    have (x : α) := Set.mem_univ x
-    simp [← htc] at this
-    exact ⟨c, this⟩
-  simp only at hs_empty
-  simp only [isBigO_top]
-  use max c (s.sup' (Finset.nonempty_of_ne_empty hs_empty) C )
-  --yes this works but the proof needs polishing
-  sorry
-
-
-end MeasureTheory
-
 open scoped ArithmeticFunction
 
 axiom hpsi_cheby : (fun n => ∑ k ∈ Finset.range (n+1), Λ k) =O[atTop] (fun n ↦ (n:ℝ))
 
-theorem ArithmeticFunction.sum_range_mul_zeta
-    {R : Type*} [Semiring R] (f : ArithmeticFunction R) (N : ℕ) :
-    ∑ d ∈ range (N + 1), (f * ζ) d = ∑ d ∈ range (N + 1), (N / d) • f d := by
-  induction N with
-  | zero => simp
-  | succ n h_ind =>
-    rw [Finset.sum_range_succ]
-    simp_rw [Nat.succ_div, add_smul, Finset.sum_add_distrib, h_ind]
-    congr 1
-    · apply Finset.sum_subset
-      · refine range_subset.mpr (le_succ _)
-      · simp only [mem_range, not_lt, nsmul_eq_mul]
-        intro d hd1 hd2
-        obtain rfl : d = n+1 := by omega
-        apply mul_eq_zero_of_left
-        convert cast_zero
-        simp only [Nat.div_eq_zero_iff, AddLeftCancelMonoid.add_eq_zero, one_ne_zero, and_false,
-          lt_add_iff_pos_right, zero_lt_one, or_true]
-    · simp_rw [boole_smul, ← Finset.sum_filter]
-      rw [Nat.filter_dvd_eq_divisors (add_one_ne_zero n)]
-      exact coe_mul_zeta_apply
-
--- #find_home! Asymptotics.isEquivalent_exp_iff_sub_isLittleO_one
 
 theorem log_stirling' :
   Tendsto (fun n => Real.log (n)!
@@ -117,31 +64,6 @@ theorem log_stirling :
   ring
 
 
-theorem multiplicity_factorial
-    {p : ℕ} (hp : Nat.Prime p) {n b : ℕ} (hlog : Nat.log p n < b) :
-    multiplicity p n.factorial = ∑ i ∈ Finset.Ico 1 b, n / p ^ i := by
-  apply multiplicity_eq_of_emultiplicity_eq_some
-  exact Prime.emultiplicity_factorial hp hlog
-
-theorem factorization_factorial
-    {p : ℕ} (hp : Nat.Prime p) {n b : ℕ} (hlog : Nat.log p n < b) :
-    n.factorial.factorization p = ∑ i ∈ Finset.Ico 1 b, n / p ^ i := by
-  rw [← multiplicity_factorial hp hlog]
-  refine Eq.symm (multiplicity_eq_factorization hp (factorial_ne_zero n))
-
-theorem isBigO_pow_right_of_le {a b : ℕ} (h : a ≤ b) :
-    (fun (x:ℝ) ↦ x^a) =O[atTop]  (fun x ↦ x^b) := by
-  refine Eventually.isBigO ?_
-  filter_upwards [Filter.eventually_ge_atTop 1, Filter.eventually_ge_atTop 0]
-  intro x hx hx'
-  simp only [norm_pow, norm_eq_abs, abs_of_nonneg hx']
-  gcongr
-  exact hx
-
-example : (fun _ ↦ 1 : ℝ → ℝ) =O[atTop] (fun x ↦ (x : ℝ)) := by
-  convert isBigO_pow_right_of_le zero_le_one with x
-  simp
-
 /- One pain point I'm running into here is finding the right theorems in the library - say I need a
 IsBigO statement but it's phrased as IsLittleO in the library. Things like natCast_atTop also make
 exact? and the like less useful.
@@ -151,7 +73,7 @@ theorem log_fac_sub_id_mul_log_isBigO_id :
   have hstirling := log_stirling
   rw [← Asymptotics.isLittleO_one_iff ℝ] at hstirling
   have : (fun _ ↦ 1 : ℝ → ℝ) =O[atTop] (fun x ↦ (x : ℝ)) := by
-    convert isBigO_pow_right_of_le zero_le_one with x
+    convert isBigO_pow_pow_atTop_of_le zero_le_one with x
     simp
   have const_isBigO (c : ℝ) : (fun (_ : ℕ) ↦ c) =O[atTop] (fun (n : ℕ) ↦ (n : ℝ)) := by
     convert (this.const_mul_left c).natCast_atTop
@@ -172,6 +94,7 @@ theorem Real.log_factorial (n : ℕ) :
   | succ n ih =>
     rw [Nat.factorial_succ, Nat.cast_mul, Real.log_mul (by norm_cast)
       (mod_cast Nat.factorial_ne_zero n), sum_range_succ, add_comm, ih]
+-- [Mathlib.Analysis.SpecialFunctions.Log.Basic]
 
 theorem log_factorial (n : ℕ) :
   Real.log (n)! = ∑ d ∈ Finset.range (n+1), ↑(n / d) * Λ d := by
@@ -184,9 +107,23 @@ theorem sum_floor_mul_vonmangoldt (n : ℕ) : ∑ d ∈ Finset.range (n+1), ↑(
   congr 1 with d
   ring
 
-theorem floor_approx (x : ℝ) (hx : 0 ≤ x) : |↑((Nat.floor x)) - x| ≤ 1  := by
+example (a b : ℝ) (hb : 0 ≤ b) : a ≤ a + b := by
+  exact (le_add_iff_nonneg_right a).mpr hb
+
+theorem floor_approx {α : Type*} [LinearOrderedRing α] [FloorSemiring α] (x : α) (hx : 0 ≤ x) :
+    |↑((Nat.floor x)) - x| ≤ 1  := by
   rw [abs_le]
-  refine ⟨by linarith [Nat.lt_floor_add_one x], by linarith [Nat.floor_le hx]⟩
+  constructor
+  · rw [le_sub_iff_add_le, add_comm, ← sub_eq_add_neg, sub_le_iff_le_add]
+    exact Nat.lt_floor_add_one x |>.le
+  · rw [sub_le_iff_le_add, add_comm]
+    apply Nat.floor_le hx |>.trans
+    rw [le_add_iff_nonneg_right]
+    exact zero_le_one' α
+
+  -- refine ⟨by linarith [Nat.lt_floor_add_one x], by linarith [Nat.floor_le hx]⟩
+
+-- #find_home! floor_approx
 
 theorem abs_natCast_div_sub_div_le_one {n d : ℕ}: |(↑(n/d) - n/d:ℝ)| ≤ 1 := by
   rw [← Nat.floor_div_eq_div (α := ℝ)]
@@ -1181,7 +1118,6 @@ theorem mertens_third :
     bound
 
 
--- #print axioms mertens_third
 
 
 end MertensThird
