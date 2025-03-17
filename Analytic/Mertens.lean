@@ -6,7 +6,10 @@ Authors: Arend Mellendijk
 import Mathlib
 
 import Analytic.Mathlib.MeasureTheory.Integral.Asymptotics
+import Analytic.Mathlib.MeasureTheory.Integral.SetIntegral
 import Analytic.Mathlib.NumberTheory.AbelSummation
+import Analytic.Mathlib.Analysis.Asymptotics.Defs
+import Analytic.ForMathlib.EquivalentLogExp
 
 open Filter Nat Real Finset
 open Asymptotics
@@ -19,55 +22,12 @@ section fun_prop
 attribute [fun_prop] measurable_log Measurable.aestronglyMeasurable
 end fun_prop
 
-
-section Asymptotics
-
-
-variable {α : Type*} {β : Type*} {E : Type*} {F : Type*} {G : Type*} {E' : Type*}
-  {F' : Type*} {G' : Type*} {E'' : Type*} {F'' : Type*} {G'' : Type*} {E''' : Type*}
-  {R : Type*} {R' : Type*} {𝕜 : Type*} {𝕜' : Type*}
-
-variable [Norm E] [Norm F] [Norm G]
-variable [SeminormedAddCommGroup E'] [SeminormedAddCommGroup F'] [SeminormedAddCommGroup G']
-  [NormedAddCommGroup E''] [NormedAddCommGroup F''] [NormedAddCommGroup G''] [SeminormedRing R]
-  [SeminormedAddGroup E''']
-  [SeminormedRing R']
-
-variable {c c' c₁ c₂ : ℝ} {f : α → E} {g : α → F} {k : α → G}
-variable {f' : α → E'} {g' : α → F'} {k' : α → G'}
-variable {f'' : α → E''} {g'' : α → F''} {k'' : α → G''}
-variable {l l' : Filter α}
-
-variable {f₁ f₂ : α → E'} {g₁ g₂ : α → F'}
-namespace Asymptotics
--- #check IsBigO.add
-
-theorem IsBigO.add_iff (h₂ : f₂ =O[l] g) : (fun x => f₁ x + f₂ x) =O[l] g ↔ (f₁ =O[l] g):= by
-  constructor
-  · intro h
-    convert h.sub h₂ with x
-    abel
-  · intro h
-    exact h.add h₂
-
-theorem IsBigO.sub_iff (h₂ : f₂ =O[l] g) : (fun x => f₁ x - f₂ x) =O[l] g ↔ (f₁ =O[l] g):= by
-  constructor
-  · intro h
-    convert h₂.add h with x
-    abel
-  · intro h
-    exact h.sub h₂
-
-end Asymptotics
-end Asymptotics
-
 section MeasureTheory
 variable {α : Type*} {E : Type*} {F : Type*} [TopologicalSpace α] [Norm E] [Norm F]
 
 def Asymptotics.IsLocallyBigO  (l : Filter α) (f : α → E) (g : α → F) :
   Prop :=
   ∀ᶠ x in l, f =O[l ⊓ (nhds x)] g
-
 
 example (f : α → E) (g : α → F) (l : Filter α) (h : f =O[cocompact α] g) (h' : IsLocallyBigO ⊤ f g) :
   f =O[⊤] g := by
@@ -91,31 +51,6 @@ example (f : α → E) (g : α → F) (l : Filter α) (h : f =O[cocompact α] g)
   --yes this works but the proof needs polishing
   sorry
 
-
-open Bornology
-
-theorem MeasureTheory.IntegrableAtFilter.integrableOn_of_principal
-    {α : Type*} {E : Type*} [MeasurableSpace α] [NormedAddCommGroup E] {f : α → E} {S : Set α}
-    {mu : Measure α} (h : IntegrableAtFilter f (𝓟 S) mu) : IntegrableOn f S mu :=
-  integrableAtFilter_principal_iff.mp h
-
-theorem MeasureTheory.IntegrableOn.integrableAtFilter
-    {α : Type*} {E : Type*} [MeasurableSpace α] [NormedAddCommGroup E] {f : α → E} {S : Set α}
-    {mu : Measure α} (h : IntegrableOn f S mu) : IntegrableAtFilter f (𝓟 S) mu :=
-  integrableAtFilter_principal_iff.mpr h
-
-theorem MeasureTheory.setIntegral_mono_on_fun_of_nonneg {X : Type*} [MeasurableSpace X]
-    {μ : Measure X} {f g : X → ℝ} {s : Set X} (hf : AEStronglyMeasurable f (μ.restrict s))
-    (hg : IntegrableOn g s μ) (hs : MeasurableSet s) (h : ∀ x ∈ s, f x ≤ g x)
-    (h_nonneg : ∀ x ∈ s, 0 ≤ f x) :
-    ∫ (x : X) in s, f x ∂μ ≤ ∫ (x : X) in s, g x ∂μ := by
-  apply MeasureTheory.setIntegral_mono_on _ hg hs h
-  rw [IntegrableOn]
-  apply MeasureTheory.Integrable.mono hg hf
-  filter_upwards [self_mem_ae_restrict hs]
-  intro x hx
-  simp only [norm_eq_abs, abs_of_nonneg, h_nonneg x hx, (h_nonneg x hx).trans (h x hx)]
-  exact h x hx
 
 end MeasureTheory
 
@@ -145,33 +80,42 @@ theorem ArithmeticFunction.sum_range_mul_zeta
       rw [Nat.filter_dvd_eq_divisors (add_one_ne_zero n)]
       exact coe_mul_zeta_apply
 
+-- #find_home! Asymptotics.isEquivalent_exp_iff_sub_isLittleO_one
+
+theorem log_stirling' :
+  Tendsto (fun n => Real.log (n)!
+    - (n * Real.log n - n + Real.log n / 2 + Real.log π / 2 + Real.log 2 / 2))
+    atTop (nhds 0) := by
+  rw [← Asymptotics.isLittleO_one_iff ℝ, ← Asymptotics.isEquivalent_exp_iff_sub_isLittleO_one]
+  have :=  Stirling.factorial_isEquivalent_stirling
+  apply this.congr_left _ |>.congr_right
+  · filter_upwards [eventually_gt_atTop 0] with n hn
+    simp_rw [add_assoc, ← add_div]
+    rw [exp_add, exp_sub, Real.exp_nat_mul, div_pow, ← exp_nat_mul, exp_log, ← log_mul, ←log_mul, ← log_sqrt, exp_log] <;> try positivity
+    ring_nf
+  · filter_upwards with n
+    rw [exp_log]
+    positivity
+
 theorem log_stirling :
   Tendsto (fun n => Real.log (n)!
     - (n * Real.log n - n + Real.log n / 2 + Real.log π / 2 + Real.log 2 / 2))
     atTop (nhds 0) := by
   have :=  Stirling.factorial_isEquivalent_stirling
-  rw [Asymptotics.isEquivalent_iff_tendsto_one ?case] at this
-  case case =>
-    filter_upwards [eventually_ge_atTop 1]
-    intro n hn
+  rw [← Asymptotics.isEquivalent_iff_log_sub_log] at this
+  case hf =>
+    filter_upwards with x
+    norm_cast
+    apply factorial_pos
+  case hg =>
+    filter_upwards [eventually_gt_atTop 0] with x hx
     positivity
-  have tendsto_log_one_zero : Tendsto Real.log (nhds 1) (nhds 0) := by
-    convert ContinuousAt.tendsto ?_
-    · simp only [log_one]
-    · simp only [continuousAt_log_iff, ne_eq, one_ne_zero, not_false_eq_true]
-  apply  (tendsto_log_one_zero.comp this).congr'
-  filter_upwards [eventually_ne_atTop 0]
-  intro n hn
-  have hsqrt_pi : √π ≠ 0 := by
-    simp [Real.pi_nonneg, Real.pi_ne_zero]
-  simp only [ofNat_pos, mul_nonneg_iff_of_pos_left, cast_nonneg, ofNat_nonneg,
-    Function.comp_apply, Pi.div_apply]
-  rw [Real.log_div (by positivity) (by simp [hn, hsqrt_pi])]
-  rw [Real.log_mul (by positivity) (by positivity), Real.log_sqrt (by positivity),
-    Real.log_mul (by positivity) (by positivity), Real.log_mul (by positivity) (by positivity),
-    Real.log_pow, Real.log_div (by positivity) (by positivity)]
-  simp only [log_exp, sub_right_inj]
+  rw [← Asymptotics.isLittleO_one_iff ℝ]
+  apply this.congr' _ (by rfl)
+  filter_upwards [eventually_gt_atTop 0] with x hx
+  rw [Real.log_mul, Real.log_sqrt, Real.log_mul, Real.log_mul, Real.log_pow, Real.log_div, Real.log_exp] <;> try positivity
   ring
+
 
 theorem multiplicity_factorial
     {p : ℕ} (hp : Nat.Prime p) {n b : ℕ} (hlog : Nat.log p n < b) :
@@ -1209,51 +1153,6 @@ theorem mertens_third_log_isLittleO_one :
   apply Filter.mem_of_superset this
   simpa [this]
 
-theorem Asymptotics.IsLittleO.isEquivalent_of_log {ι : Type*} {l : Filter ι} {f g : ι → ℝ}
-    (hf : ∀ᶠ x in l, 0 < f x) (hg : ∀ᶠ x in l, 0 < g x)
-    (h : (fun x ↦ Real.log (f x) - Real.log (g x)) =o[l] (fun _ ↦ (1 : ℝ))) :
-    IsEquivalent l f g := by
-  rw [Asymptotics.isEquivalent_iff_tendsto_one]
-  · rw [Asymptotics.isLittleO_one_iff] at h
-    apply tendsto_exp_nhds_zero_nhds_one.comp h |>.congr'
-    filter_upwards [hf, hg] with x hfx hgx
-    simp only [Function.comp_apply, Pi.div_apply, exp_sub, Real.exp_log hfx, Real.exp_log hgx]
-  · filter_upwards [hg] with x hgx
-    exact hgx.ne.symm
-
-theorem Asymptotics.IsEquivalent.log_sub_log_isLittleO_one {ι : Type*} {l : Filter ι} {f g : ι → ℝ}
-    (hf : ∀ᶠ x in l, f x ≠ 0) (hg : ∀ᶠ x in l, g x ≠ 0)
-    (h : IsEquivalent l f g) :
-    (fun x ↦ Real.log (f x) - Real.log (g x)) =o[l] (fun _ ↦ (1 : ℝ)) := by
-  rw [Asymptotics.isEquivalent_iff_tendsto_one hg] at h
-  rw [Asymptotics.isLittleO_one_iff]
-  have : Tendsto Real.log (nhds 1) (nhds 0) := by
-    convert Real.continuousAt_log _ |>.tendsto <;> simp
-  apply this.comp h |>.congr'
-  filter_upwards [hf, hg] with x hfx hgx
-  simp only [Function.comp_apply, Pi.div_apply, Real.log_div hfx hgx]
-
-theorem Asymptotics.isEquivalent_iff_log_sub_log {ι : Type*} {l : Filter ι} {f g : ι → ℝ}
-    (hf : ∀ᶠ x in l, 0 < f x) (hg : ∀ᶠ x in l, 0 < g x) :
-    (fun x ↦ Real.log (f x) - Real.log (g x)) =o[l] (fun _ ↦ (1 : ℝ)) ↔ IsEquivalent l f g := by
-  constructor
-  · exact IsLittleO.isEquivalent_of_log hf hg
-  · apply IsEquivalent.log_sub_log_isLittleO_one
-    · filter_upwards [hf] with x hfx
-      exact Ne.symm (_root_.ne_of_lt hfx)
-    · filter_upwards [hg] with x hgx
-      exact Ne.symm (_root_.ne_of_lt hgx)
-
-theorem Asymptotics.IsLittleO.isEquivalent_exp {ι : Type*} {l : Filter ι} {f g : ι → ℝ}
-    (h : (fun x ↦ f x - g x) =o[l] (fun _ ↦ (1 : ℝ))) :
-    IsEquivalent l (fun x ↦ Real.exp (f x)) (fun x ↦ Real.exp (g x)) := by
-  rw [Asymptotics.isEquivalent_iff_tendsto_one]
-  · rw [Asymptotics.isLittleO_one_iff] at h
-    apply tendsto_exp_nhds_zero_nhds_one.comp h |>.congr'
-    filter_upwards with x
-    simp [Real.exp_sub]
-  · filter_upwards with x
-    exact exp_ne_zero (g x)
 
 theorem sum_primesBelow_log_eq {n : ℕ} : ∑ p ∈ primesBelow n, Real.log (1 - (p:ℝ)⁻¹) =
     Real.log (∏ p ∈ primesBelow n, (1 - (p : ℝ)⁻¹)) := by
