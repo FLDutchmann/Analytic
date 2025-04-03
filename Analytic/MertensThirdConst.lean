@@ -34,6 +34,9 @@ theorem f_def' {σ : ℝ} (hσ : 0 < σ) : f σ = log (zeta (1+σ)) - ∑' (p : 
 theorem f_continuousOn : ContinuousOn f (Set.Ici 0) := by
   sorry
 
+theorem f_zero : f 0 = mertens₃Const - mertens₂Const := by
+  sorry
+
 -- TBD: right conditions on l
 theorem est_log (f g : ℝ → ℝ)
     (hfg : (fun x ↦ f x - x⁻¹) =O[𝓝[>] 0] (fun _ ↦ (1:ℝ))) :
@@ -47,31 +50,47 @@ theorem est_1 : (fun σ ↦ log (zeta σ) - log (σ⁻¹)) =O[𝓝[>] 0] (fun σ
 theorem est_2 : (fun σ ↦ log ((1-exp (-σ))⁻¹) - log (σ⁻¹)) =O[𝓝[>] 0] (fun σ ↦ σ) := by
   sorry
 
--- theorem est_3 : (fun σ ↦ log ((1-exp (-σ))⁻¹) - log (σ⁻¹)) =O[𝓟 (Set.Ici 0)] (fun σ ↦ σ) := by
---   sorry
--- noncomputable def logZeta (x : ℝ) : ℝ := Complex.log (riemannZeta x) |>.re
+theorem est_3 {σ : ℝ} (hσ : 0 < σ) : log ((1 - exp (- σ))⁻¹) = ∑' n : ℕ, exp (- σ * n) * (n : ℝ)⁻¹ := by
+  sorry
 
--- theorem im_zero {ι : Type*} (f : ι → ℂ)
---     (h : ∀ x, (f x).im = 0) : (∑' (p : ι), f p).im = 0 := by
---   by_cases hf : Summable f
---   · simp [Complex.im_tsum hf, h]
---   · simp [tsum_eq_zero_of_not_summable hf]
+/- This one's a little annoying. Use [1] to get the limit of the partial sums, then use [2] to get the value
+of the tsum. https://leanprover-community.github.io/mathlib4_docs/Mathlib/Topology/Algebra/InfiniteSum/NatInt.html#Summable.tendsto_sum_tsum_nat
+
+[1](https://leanprover-community.github.io/mathlib4_docs/Mathlib/NumberTheory/AbelSummation.html#sum_mul_eq_sub_integral_mul₀)
+[2](https://leanprover-community.github.io/mathlib4_docs/Mathlib/Topology/Algebra/InfiniteSum/NatInt.html#Summable.tendsto_sum_tsum_nat)
+-/
+theorem est_4 {σ : ℝ} (hσ : 0 < σ) :
+    ∑' n : ℕ, exp (- σ * n) * (n : ℝ)⁻¹ = σ * ∫ t in Set.Ioi 0, exp (- σ * t) * harmonic (⌊t⌋₊) := by
+  sorry
 
 
--- theorem logZeta_eq {x : ℝ} (hx : 1 < x) : logZeta x = ∑' (p : Nat.Primes), - Real.log (1 - ↑↑p ^ (-x)) := by exact_mod_cast calc
---   (logZeta x : ℂ) = _ := by
---     have : (∑' (p : Nat.Primes), -Complex.log (1 - ↑↑p ^ (-x : ℂ))).im = 0 := by
---       apply im_zero
---       intro p
---       simp [Complex.neg_im, neg_eq_zero, Complex.log_im, Complex.arg_eq_zero_iff, Complex.natCast_im]
+theorem est_log_zeta :
+    (fun σ ↦ log (zeta (1 + σ)) - σ * ∫ t in Set.Ioi 1, exp (- σ * t) * harmonic (⌊t⌋₊)) =O[𝓝[>] 0] (fun σ ↦ σ) := by
+  sorry
 
---       sorry
---     rw [logZeta, ← riemannZeta_eulerProduct_exp_log (by simp [hx]), Complex.log_exp] <;> rw [this]
---     all_goals linarith only [pi_pos]
---   _ = (↑(∑' (p : Nat.Primes), - Real.log (1 - ↑↑p ^ (-x)):ℝ):ℂ) := by
---     stop
---     norm_cast
---     rw [Complex.re_tsum]
---     simp only [Complex.ofReal_neg, Complex.neg_re, Complex.log_ofReal_re]
---     sorry
---   -- sorry
+noncomputable def P (t : ℝ) : ℝ :=
+  ∑ p ∈ Nat.primesBelow ⌊t⌋₊, (p : ℝ)⁻¹
+
+theorem est_P {σ : ℝ} (hσ : 0 < σ) :
+    ∑' p : Nat.Primes, (p : ℝ)⁻¹ ^(1+σ) = σ * ∫ t in Set.Ioi 0, exp (- σ * t) * P (exp t) := by
+  sorry
+
+theorem est_f :
+    (fun σ ↦ f σ - σ * ∫ t in Set.Ioi 0, exp (- σ * t) * (harmonic ⌊t⌋₊ - P (exp t))) =O[𝓝[>] 0] (fun σ ↦ σ) := by
+  sorry
+
+theorem harmonic_est :
+    (fun t ↦ harmonic (⌊t⌋₊) - (log t - eulerMascheroniConstant)) =O[𝓟 (Set.Ici 1)] fun t ↦ t⁻¹ := by
+  sorry
+
+
+theorem P_exp_est :
+    (fun t ↦ P (exp t) - (log t - mertens₂Const)) =O[𝓟 (Set.Ici 1)] fun t ↦ t⁻¹ := by
+  sorry
+
+theorem f_zero' :
+    f 0 = eulerMascheroniConstant - mertens₂Const := by
+  sorry
+
+theorem mertens₃Const_eq : mertens₃Const = eulerMascheroniConstant := by
+  sorry
