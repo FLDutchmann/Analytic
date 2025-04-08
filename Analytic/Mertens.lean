@@ -922,8 +922,10 @@ theorem mertens3_sub_mertens2_isBigO (a : ℝ) (ha : 1 < a) :
   · rfl
   · simp [ha.le]
 
+noncomputable def M : ℝ := (∑' p : ℕ, if p.Prime then ∑' n : ℕ, (p:ℝ)⁻¹^(n+2) / (n+2) else 0)
+
 noncomputable def mertens₃Const : ℝ :=
-  (∑' p : ℕ, if p.Prime then ∑' n : ℕ, (p:ℝ)⁻¹^(n+2) / (n+2) else 0) + mertens₂Const
+  M + mertens₂Const
 
 theorem inv_isBigO_inv_log_Ioi (a : ℝ) (ha : 1 < a) :
   (fun x : ℝ ↦ x⁻¹) =O[𝓟 (Set.Ioi a)] (fun x : ℝ ↦ (Real.log x)⁻¹) := by
@@ -944,7 +946,7 @@ theorem mertens_third_log_aux (a : ℝ) (ha : 1 < a) (ha' : a < 2) :
   have h₀ := mertens3_sub_mertens2_isBigO a ha |>.trans <| inv_isBigO_inv_log_Ioi a ha
   have h₁ := mertens_second a ha ha'
   simp_rw [sub_sub] at h₀
-  rw [mertens₃Const]
+  rw [mertens₃Const, M]
   apply (h₀.add h₁).congr
   · intro x
     ring

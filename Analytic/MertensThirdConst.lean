@@ -5,24 +5,90 @@ open Filter Asymptotics Real Topology
 
 open scoped Filter
 
-noncomputable def Real.zeta (x : ℝ) : ℝ := (riemannZeta x).re
+noncomputable def zeta (x : ℝ) : ℝ := (riemannZeta x).re
 
-theorem zeta_pole_estimate_nhdsWithin :
-    (fun σ:ℝ ↦ zeta σ - 1/σ) =O[𝓝[>] 0] (fun _ ↦ (1:ℝ)) := by
+theorem riemannZeta_ofReal (x : ℝ) : riemannZeta x = zeta x := by
+  sorry
+theorem riemannZeta_ofReal' (x : ℝ) (hx : 1 < x) : riemannZeta x = zeta x := by
   sorry
 
--- theorem zeta_pole_estimate_unif :
---     (fun σ:ℝ ↦ zeta σ - 1/σ) =O[𝓟 (Set.Ioi 0)] (fun _ ↦ (1:ℝ)) := by
---   sorry
+-- theorem test (f : ℕ → ℂ) (hf : ∀ n, (f n).im = 0) :
+
+/- Surely there is a better way to do this?? -/
+theorem Complex.tprod_ofReal {ι : Type*} (f : ι → ℝ) : ∏' n, (f n : ℂ) = ↑(∏' n, f n) := by
+  by_cases h : Multipliable f
+  · have := h.hasProd
+    rw [HasProd] at this
+    have hofReal := Complex.continuous_ofReal.tendsto (∏' n, f n)
+    have := hofReal.comp this
+    simp_rw [Function.comp_def, Complex.ofReal_prod] at this
+    have : HasProd (fun n ↦ (f n : ℂ)) ↑(∏' n, f n) := this
+    rw [this.tprod_eq]
+  · rw [tprod_eq_one_of_not_multipliable h, tprod_eq_one_of_not_multipliable]
+    · simp
+    contrapose! h
+    rw [Multipliable] at h ⊢
+    obtain ⟨a, ha⟩ := h
+    use a.re
+    rw [HasProd] at ha ⊢
+    have hre := Complex.continuous_re.tendsto a
+    have := hre.comp ha
+    simp_rw [← Complex.ofReal_prod, Function.comp_def, Complex.ofReal_re] at this
+    exact this
+
+theorem Real.zeta_eulerProd (x : ℝ) (hx : 1 < x) :
+    zeta x = ∏' p : Nat.Primes, (1 - 1/(p:ℝ)^x)⁻¹ := by
+  rw [zeta, ← riemannZeta_eulerProduct_tprod ?side]
+  case side =>
+    simp [hx]
+  calc
+  _ = (∏' (p : Nat.Primes), (↑(1 - p ^ (-x:ℝ) : ℝ)⁻¹ : ℂ)).re := by
+    congr 2 with p
+    push_cast
+    congr
+    rw [Complex.ofReal_cpow] <;> simp
+  _ = _ := by
+    rw [Complex.tprod_ofReal]
+    simp only [Complex.ofReal_re, one_div]
+    congr with p
+    rw [Real.rpow_neg]
+    simp
+
+theorem zeta_pole_estimate_nhdsWithin :
+    (fun σ:ℝ ↦ zeta (1+σ) - 1/σ) =O[𝓝[>] 0] (fun _ ↦ (1:ℝ)) := by
+  have := (isBigO_riemannZeta_sub_one_div (F := ℝ))
+  have tendsTo_ofReal : Tendsto Complex.ofReal (𝓝 1) (𝓝 1) := by
+    apply Complex.continuous_ofReal.tendsto
+  have := (this.comp_tendsto tendsTo_ofReal).mono (nhdsWithin_le_nhds (s := Set.Ioi 1))
+  have htt : Tendsto (fun σ ↦ 1 + σ) (𝓝[>] 0) (𝓝[>] 1) := by
+    convert continuous_add_left (1:ℝ) |>.tendsto 0
+    simp
+
+  have := (this.comp_tendsto (k := fun σ ↦ 1 + σ) (l' := 𝓝[>] 0) ?_).congr'
+
+
+
+
+  simp only [one_div, Function.comp_def, riemannZeta_ofReal] at this
+  norm_cast at this
+  ·
+    simp
 
 
 theorem euler_product {σ : ℝ} (hσ : 0 < σ) :
-    zeta σ = ∏' p : Nat.Primes, (1 - 1 / ((p:ℝ)^(1+σ)))⁻¹ := by
-  sorry
+    zeta (1+σ) = ∏' p : Nat.Primes, (1 - 1 / ((p:ℝ)^(1+σ)))⁻¹ := by
+  apply Real.zeta_eulerProd (1 + σ)
+  linarith
 
 theorem Real.log_zeta {σ : ℝ} (hσ : 0 < σ) :
-    log (zeta σ) = ∑' p : Nat.Primes, log ((1 - 1/(p:ℝ)^(1+σ))⁻¹) := by
-  sorry
+    log (zeta (1+σ)) = ∑' p : Nat.Primes, log ((1 - 1/(p:ℝ)^(1+σ))⁻¹) := by
+  rw [euler_product hσ]
+  apply_fun exp
+  · rw [Real.exp_log, Real.rexp_tsum_eq_tprod]
+    · sorry
+    · sorry
+    · sorry
+  · exact exp_injective
 
 private noncomputable def f (σ : ℝ) : ℝ :=
   ∑' p : Nat.Primes, (log ((1 - 1/(p:ℝ)^(1+σ))⁻¹) - 1 / (p : ℝ)^(1+σ))
