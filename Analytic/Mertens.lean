@@ -750,17 +750,17 @@ theorem tsum_le_tsum_of_nonneg (h : ∀ i, f i ≤ g i) (hf : ∀ x, 0 ≤ f x) 
   apply tsum_le_tsum h _ hg
   apply hg.of_nonneg_of_le hf h
 
-theorem tsum_inv_pow_div_id_le (p : ℕ) (hp : 1 < p)  :
-  ∑' n : ℕ, (p:ℝ)⁻¹^(n+2) / (n+2) ≤ (p * (p-1):ℝ)⁻¹ :=
-  have geom : HasSum (fun n : ℕ ↦ (p : ℝ)⁻¹ ^ n) ((1 - (p:ℝ)⁻¹)⁻¹) := by
+theorem tsum_inv_pow_div_id_le (x : ℝ) (hx : 1 < x)  :
+  ∑' n : ℕ, x⁻¹^(n+2) / (n+2) ≤ (x * (x-1):ℝ)⁻¹ :=
+  have geom : HasSum (fun n : ℕ ↦ x⁻¹ ^ n) ((1 - x⁻¹)⁻¹) := by
     apply hasSum_geometric_of_abs_lt_one
     rw [abs_inv, inv_lt_one_iff₀]
-    simp [hp]
-  have summable : Summable fun i ↦ (p:ℝ)⁻¹ ^ (i + 2) := by
+    simp [hx, lt_abs]
+  have summable : Summable fun i ↦ x⁻¹ ^ (i + 2) := by
     rw [summable_nat_add_iff]
     exact geom.summable
   calc
-  _ ≤ ∑' n : ℕ, (p:ℝ)⁻¹^(n+2) := by
+  _ ≤ ∑' n : ℕ, x⁻¹^(n+2) := by
     apply tsum_le_tsum_of_nonneg
     · intro n
       apply _root_.div_le_self
@@ -769,16 +769,20 @@ theorem tsum_inv_pow_div_id_le (p : ℕ) (hp : 1 < p)  :
         omega
     · bound
     · apply summable
-  _ = (p * (p - 1):ℝ)⁻¹  := by
-    have : HasSum (fun n : ℕ ↦ (p : ℝ)⁻¹^(n+2)) ((1-(p:ℝ)⁻¹)⁻¹*(p:ℝ)⁻¹^2) := by
+  _ = (x * (x - 1):ℝ)⁻¹  := by
+    have : HasSum (fun n : ℕ ↦ x⁻¹^(n+2)) ((1-x⁻¹)⁻¹*x⁻¹^2) := by
       simp_rw [pow_add, ]
       rw [hasSum_mul_right_iff (by positivity)]
       · exact geom
     convert this.tsum_eq using 1
     rw [inv_pow, ← mul_inv]
     congr 1
-    field_simp [show (p : ℝ) ≠ 0 by positivity]
+    field_simp [show x ≠ 0 by positivity]
     ring
+
+theorem tsum_inv_pow_div_id_le_nat (p : ℕ) (hp : 1 < p)  :
+  ∑' n : ℕ, (p:ℝ)⁻¹^(n+2) / (n+2) ≤ (p * (p-1):ℝ)⁻¹ :=
+  tsum_inv_pow_div_id_le p (mod_cast hp)
 
 theorem summable_aux :
     Summable (fun n : ℕ ↦ (n * (n-1):ℝ)⁻¹) := by
@@ -791,7 +795,7 @@ theorem summable_thing :
   apply Summable.of_norm_bounded_eventually_nat _ summable_aux
   filter_upwards [eventually_gt_atTop 1] with p hp
   rw [norm_eq_abs, abs_of_nonneg]
-  · exact tsum_inv_pow_div_id_le p hp
+  · exact tsum_inv_pow_div_id_le p (mod_cast hp)
   · bound
 
 theorem summable_thing' :
@@ -858,7 +862,7 @@ private theorem tailSum_isBigO_inv_nat :
       case nonneg =>
         bound
       apply tsum_le_tsum_of_nonneg
-      · bound [tsum_inv_pow_div_id_le]
+      · bound [tsum_inv_pow_div_id_le_nat]
       · bound
       · apply (summable_nat_add_iff (k+1)).mpr summable_aux
     _ =ᶠ[atTop] _ := by
