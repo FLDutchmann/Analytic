@@ -7,10 +7,10 @@ open scoped Filter
 
 noncomputable def zeta (x : ℝ) : ℝ := (riemannZeta x).re
 
-theorem riemannZeta_ofReal (x : ℝ) : riemannZeta x = zeta x := by
-  sorry
-theorem riemannZeta_ofReal' (x : ℝ) (hx : 1 < x) : riemannZeta x = zeta x := by
-  sorry
+-- theorem riemannZeta_ofReal (x : ℝ) : riemannZeta x = zeta x := by
+--   sorry
+-- theorem riemannZeta_ofReal' (x : ℝ) (hx : 1 < x) : riemannZeta x = zeta x := by
+--   sorry
 
 -- theorem test (f : ℕ → ℂ) (hf : ∀ n, (f n).im = 0) :
 
@@ -54,26 +54,29 @@ theorem Real.zeta_eulerProd (x : ℝ) (hx : 1 < x) :
     rw [Real.rpow_neg]
     simp
 
+theorem Asymptotics.IsBigO.re {α F : Type*} [Norm F] {l : Filter α} {f : α → ℂ} {g : α → F} (h : f =O[l] g) : (Complex.re ∘ f) =O[l] g := by
+  apply IsBigO.trans _ h
+  apply IsBigO.of_norm_right
+  apply IsBigO.of_norm_le
+  intro x
+  simp only [Function.comp_apply, norm_eq_abs]
+  exact Complex.abs_re_le_norm (f x)
+
+/- This is actually true for `𝓝 0`, but we only need it to the right of 0.-/
 theorem zeta_pole_estimate_nhdsWithin :
-    (fun σ:ℝ ↦ zeta (1+σ) - 1/σ) =O[𝓝[>] 0] (fun _ ↦ (1:ℝ)) := by
-  have := (isBigO_riemannZeta_sub_one_div (F := ℝ))
-  have tendsTo_ofReal : Tendsto Complex.ofReal (𝓝 1) (𝓝 1) := by
-    apply Complex.continuous_ofReal.tendsto
-  have := (this.comp_tendsto tendsTo_ofReal).mono (nhdsWithin_le_nhds (s := Set.Ioi 1))
-  have htt : Tendsto (fun σ ↦ 1 + σ) (𝓝[>] 0) (𝓝[>] 1) := by
-    convert continuous_add_left (1:ℝ) |>.tendsto 0
-    simp
-
-  have := (this.comp_tendsto (k := fun σ ↦ 1 + σ) (l' := 𝓝[>] 0) ?_).congr'
-
-
-
-
-  simp only [one_div, Function.comp_def, riemannZeta_ofReal] at this
-  norm_cast at this
-  ·
-    simp
-
+    (fun σ:ℝ ↦ zeta (1+σ) - σ⁻¹) =O[𝓝[>] 0] (fun _ ↦ (1:ℝ)) := by
+  have : (fun σ:ℂ ↦ riemannZeta (1+σ) - 1/σ) =O[𝓝 0] (fun _ ↦ (1:ℝ)) := by
+    have := (isBigO_riemannZeta_sub_one_div (F := ℝ))
+    have := this.comp_tendsto (add_zero (1:ℂ) ▸ (continuous_add_left (1:ℂ)).tendsto 0)
+    simpa only [one_div, Function.comp_def, add_sub_cancel_left] using this
+  have := this.comp_tendsto (Complex.continuous_ofReal.tendsto _)
+  simp only [one_div, Function.comp_def] at this
+  apply (this.re.mono nhdsWithin_le_nhds).congr'
+  · filter_upwards with σ
+    simp only [Function.comp_apply, Complex.sub_re, Complex.inv_re, Complex.ofReal_re,
+      Complex.normSq_ofReal, div_self_mul_self', sub_left_inj, zeta]
+    norm_num
+  · rfl
 
 theorem euler_product {σ : ℝ} (hσ : 0 < σ) :
     zeta (1+σ) = ∏' p : Nat.Primes, (1 - 1 / ((p:ℝ)^(1+σ)))⁻¹ := by
