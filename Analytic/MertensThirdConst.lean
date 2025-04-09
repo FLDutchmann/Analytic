@@ -1,5 +1,5 @@
 import Analytic.Mertens
-import Analytic.Harmonic
+
 
 open Filter Asymptotics Real Topology
 
@@ -36,6 +36,22 @@ theorem Complex.tprod_ofReal {ι : Type*} (f : ι → ℝ) : ∏' n, (f n : ℂ)
     simp_rw [← Complex.ofReal_prod, Function.comp_def, Complex.ofReal_re] at this
     exact this
 
+theorem hassum_log {ι : Type*} {f : ι → ℝ}  {a : ℝ} (ha : a ≠ 0) (h : HasProd f a) :
+    HasSum (fun x ↦ Real.log (f x)) (Real.log a) := by
+  have hf : ∀ i, f i ≠ 0 := by
+    intro i hi
+    apply ha
+    -- have := hasProd_zero_of_exists_eq_zero ⟨i, hi⟩
+    sorry
+  rw [HasProd] at h
+  have := (Real.continuousAt_log ha).tendsto.comp h
+  simp only [Function.comp_def] at this
+  rw [HasSum]
+  convert this
+  rw [log_prod]
+  intro x _
+  exact hf x
+
 theorem Real.zeta_eulerProd (x : ℝ) (hx : 1 < x) :
     zeta x = ∏' p : Nat.Primes, (1 - 1/(p:ℝ)^x)⁻¹ := by
   rw [zeta, ← riemannZeta_eulerProduct_tprod ?side]
@@ -54,7 +70,8 @@ theorem Real.zeta_eulerProd (x : ℝ) (hx : 1 < x) :
     rw [Real.rpow_neg]
     simp
 
-theorem Asymptotics.IsBigO.re {α F : Type*} [Norm F] {l : Filter α} {f : α → ℂ} {g : α → F} (h : f =O[l] g) : (Complex.re ∘ f) =O[l] g := by
+theorem Asymptotics.IsBigO.re {α F : Type*} [Norm F] {l : Filter α} {f : α → ℂ} {g : α → F}
+    (h : f =O[l] g) : (Complex.re ∘ f) =O[l] g := by
   apply IsBigO.trans _ h
   apply IsBigO.of_norm_right
   apply IsBigO.of_norm_le
@@ -82,6 +99,7 @@ theorem euler_product {σ : ℝ} (hσ : 0 < σ) :
     zeta (1+σ) = ∏' p : Nat.Primes, (1 - 1 / ((p:ℝ)^(1+σ)))⁻¹ := by
   apply Real.zeta_eulerProd (1 + σ)
   linarith
+
 
 theorem Real.log_zeta {σ : ℝ} (hσ : 0 < σ) :
     log (zeta (1+σ)) = ∑' p : Nat.Primes, log ((1 - 1/(p:ℝ)^(1+σ))⁻¹) := by
