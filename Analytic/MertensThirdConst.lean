@@ -261,12 +261,53 @@ theorem f_zero : f 0 = M := by
   rw [tsum_subtype {n : ℕ | n.Prime} (fun k ↦ ∑' n : ℕ, (((k:ℝ)^(n+2))⁻¹/(n+2))) ]
   simp [Set.indicator_apply]
 
+theorem log_add_id_IsBigO_nhdsWithin_id :
+    (fun x ↦ log (1 + x)) =O[𝓝 0] fun x ↦ x := by
+  rw [Asymptotics.isBigO_iff']
+  refine ⟨2, by norm_num, ?_⟩
+  filter_upwards [eventually_abs_sub_lt 0 (show 0 < 1/2 by norm_num)] with x hx
+  simp only [Set.mem_Ioi, norm_eq_abs] at ⊢ hx
+  simp only [sub_zero, one_div] at hx
+  have h := Real.abs_log_sub_add_sum_range_le (x := -x) (by simp only [abs_neg]; linarith) 0
+  simp only [Finset.range_zero, Finset.sum_empty, sub_neg_eq_add, zero_add, abs_neg,
+    pow_one] at h
+  have : 1/2 ≤ 1 - |x| := by
+    linarith
+  apply h.trans
+  rw [div_le_iff₀]
+  calc _ = 2 * |x| * (1/2) := by ring
+    _ ≤ _ := by gcongr
+  linarith
+
+example (f : ℝ → ℝ) (hf : f =O[𝓝 0] (fun x ↦ x)) :
+    (fun x ↦ log (1 + f x)) =O[𝓝 0] (fun x ↦ x) := by
+  have := log_add_id_IsBigO_nhdsWithin_id.comp_tendsto (k := f) (l' := 𝓝 0)
+  simp [Function.comp_def] at this
+  apply (this _).trans hf
+  apply hf.trans_tendsto
+  apply continuous_id.tendsto
+
+example (f : ℝ → ℝ) (hf : f =O[𝓝[>] 0] (fun x ↦ x)) :
+    (fun x ↦ log (1 + f x)) =O[𝓝[>] 0] (fun x ↦ x) := by
+  have := log_add_id_IsBigO_nhdsWithin_id.comp_tendsto (k := f) (l' := 𝓝[>] 0)
+  simp [Function.comp_def] at this
+  apply (this _).trans hf
+  apply hf.trans_tendsto
+  apply Filter.Tendsto.mono_left (continuous_id.tendsto 0)
+  exact nhdsWithin_le_nhds
+
 -- TBD: right conditions on l
-theorem est_log (f g : ℝ → ℝ)
+theorem est_log (f g : ℝ → ℝ) (hf : ∀ᶠ x in 𝓝[>] 0, f x ≠ 0)
     (hfg : (fun x ↦ f x - x⁻¹) =O[𝓝[>] 0] (fun _ ↦ (1:ℝ))) :
     (fun x ↦ log (f x) - log (x⁻¹)) =O[𝓝[>] 0] (fun x ↦ x) := by
-  sorry
-
+  have := hfg.mul (isBigO_refl (fun x ↦ x) _)
+  calc
+    _ =ᶠ[𝓝[>] 0] (fun x ↦ log (f x * x)) := by
+      filter_upwards [eventually_mem_nhdsWithin, hf] with x hx hfx
+      simp only [Set.mem_Ioi, log_inv, sub_neg_eq_add] at hx ⊢
+      rw [log_mul hfx hx.ne.symm]
+    _ =O[𝓝[>] 0] _ := by
+      sorry
 
 theorem est_1 : (fun σ ↦ log (zeta σ) - log (σ⁻¹)) =O[𝓝[>] 0] (fun σ ↦ σ) := by
   sorry
