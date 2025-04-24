@@ -287,7 +287,7 @@ example (f : ℝ → ℝ) (hf : f =O[𝓝 0] (fun x ↦ x)) :
   apply hf.trans_tendsto
   apply continuous_id.tendsto
 
-example (f : ℝ → ℝ) (hf : f =O[𝓝[>] 0] (fun x ↦ x)) :
+theorem isBigO_log_one_add (f : ℝ → ℝ) (hf : f =O[𝓝[>] 0] (fun x ↦ x)) :
     (fun x ↦ log (1 + f x)) =O[𝓝[>] 0] (fun x ↦ x) := by
   have := log_add_id_IsBigO_nhdsWithin_id.comp_tendsto (k := f) (l' := 𝓝[>] 0)
   simp [Function.comp_def] at this
@@ -297,22 +297,120 @@ example (f : ℝ → ℝ) (hf : f =O[𝓝[>] 0] (fun x ↦ x)) :
   exact nhdsWithin_le_nhds
 
 -- TBD: right conditions on l
-theorem est_log (f g : ℝ → ℝ) (hf : ∀ᶠ x in 𝓝[>] 0, f x ≠ 0)
+theorem est_log (f : ℝ → ℝ) (hf : ∀ᶠ x in 𝓝[>] 0, f x ≠ 0)
     (hfg : (fun x ↦ f x - x⁻¹) =O[𝓝[>] 0] (fun _ ↦ (1:ℝ))) :
     (fun x ↦ log (f x) - log (x⁻¹)) =O[𝓝[>] 0] (fun x ↦ x) := by
-  have := hfg.mul (isBigO_refl (fun x ↦ x) _)
-  calc
-    _ =ᶠ[𝓝[>] 0] (fun x ↦ log (f x * x)) := by
-      filter_upwards [eventually_mem_nhdsWithin, hf] with x hx hfx
-      simp only [Set.mem_Ioi, log_inv, sub_neg_eq_add] at hx ⊢
-      rw [log_mul hfx hx.ne.symm]
-    _ =O[𝓝[>] 0] _ := by
-      sorry
+  have := isBigO_log_one_add (fun x ↦ x * f x - 1) ?side
+  case side =>
+    have := hfg.mul (isBigO_refl (fun x ↦ x) _)
+    apply this.congr'
+    · filter_upwards [eventually_mem_nhdsWithin] with x hx
+      simp only [Set.mem_Ioi] at hx
+      simp [sub_mul, hx.ne.symm, mul_comm x]
+    · simp
+  apply this.congr' ?_ (by rfl)
+  filter_upwards [eventually_mem_nhdsWithin, hf] with x hx hfx
+  simp only [Set.mem_Ioi] at hx
+  ring_nf
+  rw [Real.log_mul hx.ne.symm hfx, Real.log_inv]
+  ring
 
-theorem est_1 : (fun σ ↦ log (zeta σ) - log (σ⁻¹)) =O[𝓝[>] 0] (fun σ ↦ σ) := by
-  sorry
+theorem est_1 : (fun σ ↦ log (zeta (1 + σ)) - log (σ⁻¹)) =O[𝓝[>] 0] (fun σ ↦ σ) := by
+  apply est_log _ _ zeta_pole_estimate_nhdsWithin
+  filter_upwards [eventually_mem_nhdsWithin] with x hx
+  simp only [Set.mem_Ioi] at hx
+  apply zeta_ne_zero
+  linarith only [hx]
+
+
+theorem inv_sub_one_isBigO_pow
+    {f : ℝ → ℝ} {a : ℝ} (ha : 0 < a) (hf : (fun x ↦ f x - 1) =O[𝓝 0] fun x ↦ x^a) :
+    (fun x ↦ (f x)⁻¹ - 1) =O[𝓝 0] fun x ↦ x^a := by
+  have : Tendsto f (𝓝 0) (𝓝 1) := by
+    have := hf.trans_tendsto ?side
+    case side =>
+      convert (Real.continuousAt_rpow_const _ _ _).tendsto
+      · simp [ha.ne.symm]
+      · simp [ha.le]
+    convert this.add (tendsto_const_nhds (x := 1)) using 1
+    · ext x
+      ring
+    simp
+  have hf_ne_zero : ∀ᶠ x in 𝓝 0, f x ≠ 0 := by
+    exact this.eventually_ne (by norm_num)
+  have : (fun _ ↦ (1:ℝ)) =O[𝓝 0] f := by
+    apply Asymptotics.isBigO_of_div_tendsto_nhds (c := 1)
+    · simp [Pi.div_def]
+      simpa using Tendsto.inv₀ this
+    · simpa using hf_ne_zero
+  apply (hf.mul (this.inv_rev (by simp))).neg_left.congr'
+  · filter_upwards [hf_ne_zero]  with x hx
+    simp [sub_mul, hx]
+  · simp
+
+theorem inv_sub_one_isBigO_pow' {l : Filter ℝ} (hl : l ≤ 𝓝 0)
+    {f : ℝ → ℝ} {a : ℝ} (ha : 0 < a) (hf : (fun x ↦ f x - 1) =O[l] fun x ↦ x^a) :
+    (fun x ↦ (f x)⁻¹ - 1) =O[l] fun x ↦ x^a := by
+  have : Tendsto f l (𝓝 1) := by
+    have := hf.trans_tendsto ?side
+    case side =>
+      apply Tendsto.mono_left _ hl
+      convert (Real.continuousAt_rpow_const _ _ _).tendsto
+      · simp [ha.ne.symm]
+      · simp [ha.le]
+    convert this.add (tendsto_const_nhds (x := 1)) using 1
+    · ext x
+      ring
+    simp
+  have hf_ne_zero : ∀ᶠ x in l, f x ≠ 0 := by
+    exact this.eventually_ne (by norm_num)
+  have : (fun _ ↦ (1:ℝ)) =O[l] f := by
+    apply Asymptotics.isBigO_of_div_tendsto_nhds (c := 1)
+    · simp [Pi.div_def]
+      simpa using Tendsto.inv₀ this
+    · simpa using hf_ne_zero
+  apply (hf.mul (this.inv_rev (by simp))).neg_left.congr'
+  · filter_upwards [hf_ne_zero]  with x hx
+    simp [sub_mul, hx]
+  · simp
+
+example {f : ℝ → ℝ} {a b : ℝ} (hb : a < b) (hf : (fun x ↦ f x - x^a) =O[𝓝[>] 0] fun x ↦ x^b) :
+    (fun x ↦ (f x)⁻¹ - x^(-a)) =O[𝓝[>] 0] fun x ↦ x^(b-2*a) := by
+  have := inv_sub_one_isBigO_pow' (f := fun x ↦ x ^ (-a) * f x)  (a := (b-a)) ?filter (by linarith)
+    (l := 𝓝[>] 0) ?side
+  case filter =>
+    exact nhdsWithin_le_nhds
+  case side =>
+    apply (hf.mul (isBigO_refl (fun x ↦ x ^ (-a)) _)).congr'
+    · filter_upwards [eventually_mem_nhdsWithin] with x hx
+      simp only [Set.mem_Ioi] at hx
+      simp [sub_mul, hx, ← Real.rpow_add, mul_comm]
+    · filter_upwards [eventually_mem_nhdsWithin] with x hx
+      simp only [Set.mem_Ioi] at hx
+      rw [← Real.rpow_add hx]
+      ring_nf
+  simp [mul_inv_rev, rpow_neg] at this
+  apply this.mul (isBigO_refl (fun x ↦ x ^ (-a)) _) |>.congr'
+  · filter_upwards [eventually_mem_nhdsWithin] with x hx
+    simp only [Set.mem_Ioi] at hx
+    simp [sub_mul, mul_assoc, ]
+    rw [inv_mul_cancel₀]
+    · simp
+    · positivity
+  · filter_upwards [eventually_mem_nhdsWithin] with x hx
+    simp only [Set.mem_Ioi] at hx
+    rw [← rpow_add hx]
+    ring_nf
+
+#check Real.exp_sub_sum_range_isBigO_pow
 
 theorem est_2 : (fun σ ↦ log ((1-exp (-σ))⁻¹) - log (σ⁻¹)) =O[𝓝[>] 0] (fun σ ↦ σ) := by
+  apply est_log
+  · filter_upwards [eventually_mem_nhdsWithin] with x hx
+    simp only [Set.mem_Ioi] at hx
+    apply inv_ne_zero
+    rw [ne_eq, sub_eq_zero, eq_comm]
+    simp [exp_eq_one_iff, neg_eq_zero, hx.ne.symm]
   sorry
 
 theorem est_3 {σ : ℝ} (hσ : 0 < σ) : log ((1 - exp (- σ))⁻¹) = ∑' n : ℕ, exp (- σ * n) * (n : ℝ)⁻¹ := by
