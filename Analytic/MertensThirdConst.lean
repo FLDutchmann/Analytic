@@ -374,7 +374,7 @@ theorem inv_sub_one_isBigO_pow' {l : Filter ℝ} (hl : l ≤ 𝓝 0)
     simp [sub_mul, hx]
   · simp
 
-example {f : ℝ → ℝ} {a b : ℝ} (hb : a < b) (hf : (fun x ↦ f x - x^a) =O[𝓝[>] 0] fun x ↦ x^b) :
+theorem inv_sub_pow_isBigO {f : ℝ → ℝ} {a b : ℝ} (hb : a < b) (hf : (fun x ↦ f x - x^a) =O[𝓝[>] 0] fun x ↦ x^b) :
     (fun x ↦ (f x)⁻¹ - x^(-a)) =O[𝓝[>] 0] fun x ↦ x^(b-2*a) := by
   have := inv_sub_one_isBigO_pow' (f := fun x ↦ x ^ (-a) * f x)  (a := (b-a)) ?filter (by linarith)
     (l := 𝓝[>] 0) ?side
@@ -402,7 +402,20 @@ example {f : ℝ → ℝ} {a b : ℝ} (hb : a < b) (hf : (fun x ↦ f x - x^a) =
     rw [← rpow_add hx]
     ring_nf
 
-#check Real.exp_sub_sum_range_isBigO_pow
+theorem extracted_1 : (fun x ↦ 1 - rexp (-x) - x ^ 1) =O[𝓝 0] fun x ↦ x ^ 2 := by
+  have := Real.exp_sub_sum_range_isBigO_pow 2 |>.neg_left
+  simp only [Finset.sum_range_succ, Finset.range_one, Finset.sum_singleton, pow_zero,
+    Nat.factorial_zero, Nat.cast_one, ne_eq, one_ne_zero, not_false_eq_true, div_self, pow_one,
+    Nat.factorial_one, div_one, Nat.factorial_two, Nat.cast_ofNat] at this
+  have ht : Tendsto (fun x : ℝ ↦ -x) (𝓝 0) (𝓝 0) := by
+    convert continuous_neg.tendsto (0:ℝ)
+    simp
+  have := this.comp_tendsto ht
+  apply this.congr
+  · intro x
+    simp only [neg_sub, Function.comp_apply, pow_one]
+    ring
+  · simp
 
 theorem est_2 : (fun σ ↦ log ((1-exp (-σ))⁻¹) - log (σ⁻¹)) =O[𝓝[>] 0] (fun σ ↦ σ) := by
   apply est_log
@@ -411,10 +424,32 @@ theorem est_2 : (fun σ ↦ log ((1-exp (-σ))⁻¹) - log (σ⁻¹)) =O[𝓝[>]
     apply inv_ne_zero
     rw [ne_eq, sub_eq_zero, eq_comm]
     simp [exp_eq_one_iff, neg_eq_zero, hx.ne.symm]
-  sorry
+  convert_to (fun x ↦ (1 - rexp (-x))⁻¹ - x^(-1:ℝ)) =O[𝓝[>] 0] fun x ↦ x^(2 - 2 * 1:ℝ) using 0
+  · apply Asymptotics.isBigO_congr
+    · filter_upwards [eventually_mem_nhdsWithin] with x hx
+      simp only [Set.mem_Ioi] at hx
+      simp [rpow_neg, hx.le]
+    · simp
+  apply inv_sub_pow_isBigO
+  · simp
+  norm_cast
+  apply extracted_1.mono nhdsWithin_le_nhds
 
+theorem est_3_hasSum {σ : ℝ} (hσ : 0 < σ) : HasSum (fun n : ℕ ↦ exp (- σ * n) * (n : ℝ)⁻¹) (log ((1 - exp (-σ))⁻¹)) := by
+  have := hasSum_pow_div_log_of_abs_lt_one (show |exp (-σ)| < 1 by simp [hσ])
+  norm_cast at this
+  rw [hasSum_nat_add_iff 1 (f := fun n ↦ exp (-σ)^n / n)] at this
+  simp only [Finset.range_one, Finset.sum_singleton, pow_zero, CharP.cast_eq_zero, div_zero,
+    add_zero] at this
+  convert this using 1
+  · ext n
+    rw [exp_mul, rpow_natCast]
+    ring
+  simp
+
+-- hasSum_pow_div_log_of_abs_lt_one
 theorem est_3 {σ : ℝ} (hσ : 0 < σ) : log ((1 - exp (- σ))⁻¹) = ∑' n : ℕ, exp (- σ * n) * (n : ℝ)⁻¹ := by
-  sorry
+  rw [est_3_hasSum hσ |>.tsum_eq]
 
 /- This one's a little annoying. Use [1] to get the limit of the partial sums, then use [2] to get the value
 of the tsum. https://leanprover-community.github.io/mathlib4_docs/Mathlib/Topology/Algebra/InfiniteSum/NatInt.html#Summable.tendsto_sum_tsum_nat
