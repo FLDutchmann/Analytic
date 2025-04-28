@@ -457,8 +457,49 @@ of the tsum. https://leanprover-community.github.io/mathlib4_docs/Mathlib/Topolo
 [1](https://leanprover-community.github.io/mathlib4_docs/Mathlib/NumberTheory/AbelSummation.html#sum_mul_eq_sub_integral_mul₀)
 [2](https://leanprover-community.github.io/mathlib4_docs/Mathlib/Topology/Algebra/InfiniteSum/NatInt.html#Summable.tendsto_sum_tsum_nat)
 -/
+
+
 theorem est_4 {σ : ℝ} (hσ : 0 < σ) :
-    ∑' n : ℕ, exp (- σ * n) * (n : ℝ)⁻¹ = σ * ∫ t in Set.Ioi 0, exp (- σ * t) * harmonic (⌊t⌋₊) := by
+    ∑' n : ℕ, exp ((-σ) * n) * (n : ℝ)⁻¹ = σ * ∫ t in Set.Ioi 0, exp ((-σ) * t) * harmonic (⌊t⌋₊) := by
+
+  let c (n : ℕ) : ℝ := (n : ℝ)⁻¹
+  let f (x : ℝ) := exp ((-σ) * x)
+  let f' (x : ℝ) := (-σ) * exp ((-σ) * x)
+  let g (x : ℝ) := exp ((-σ) * x) * (Real.log x + 1)
+  have hf (x : ℝ) : HasDerivAt f (f' x) x := by
+    simp only [f]
+    convert (hasDerivAt_exp ((-σ) * x)).comp x ((hasDerivAt_id' x).const_mul (-σ)) using 1
+    ring
+  have htends := tendsto_sum_mul_atTop_nhds_one_sub_integral₀ c (by norm_num) (f := f) ?hf_diff (l := 0) ?hf_int ?hlim (g := g) ?hbigO ?hg_int
+  case hf_diff =>
+    intro t _
+    apply (hf _).differentiableAt
+  case hf_int =>
+    simp_rw [deriv_eq hf, f']
+    apply MeasureTheory.LocallyIntegrableOn.continuousOn_mul
+    · apply MeasureTheory.IntegrableOn.locallyIntegrableOn
+      rw [integrableOn_Ici_iff_integrableOn_Ioi]
+      apply ((exp_neg_integrableOn_Ioi 1 hσ))
+    · exact continuousOn_const
+    · exact isLocallyClosed_Ici
+  case hlim =>
+    -- perhaps do the big-o statement first, then deduce this from that - it'll be easier to get an asymptotic estimate involving logs rather than harmonic sums.
+    sorry
+  case hbigO =>
+    simp_rw [deriv_eq hf, f', c]
+    sorry
+  case hg_int =>
+    sorry
+
+  simp_rw [← Nat.range_succ_eq_Icc_zero] at htends
+  have hsummable : Summable (fun n : ℕ ↦ f n * c n) := by
+    sorry
+  have := (Summable.tendsto_sum_tsum_nat hsummable).comp (tendsto_add_atTop_nat 1)
+  simp only [f', f, c, Function.comp_def] at this
+  have := tendsto_nhds_unique htends this
+  rw [← this]
+  simp_rw [harmonic_eq_sum_Icc, c, deriv_eq hf, f']
+  push_cast
   sorry
 
 
