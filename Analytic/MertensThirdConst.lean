@@ -1,5 +1,5 @@
 import Analytic.Mertens
-
+import Analytic.Mathlib.Analysis.SpecialFunctions.Pow.Asymptotics
 
 open Filter Asymptotics Real Topology
 
@@ -458,19 +458,72 @@ of the tsum. https://leanprover-community.github.io/mathlib4_docs/Mathlib/Topolo
 [2](https://leanprover-community.github.io/mathlib4_docs/Mathlib/Topology/Algebra/InfiniteSum/NatInt.html#Summable.tendsto_sum_tsum_nat)
 -/
 
+theorem harmonic_eq_sum_range_succ (n : ℕ) : harmonic n = ∑ i ∈ Finset.range (n + 1), (i : ℚ)⁻¹ := by
+  induction n with
+  | zero =>
+    simp
+  | succ n ih =>
+    simp  [ih, Finset.sum_range_succ]
 
+theorem harmonic_nonneg (n : ℕ) : 0 ≤ harmonic n := by
+  rw [harmonic]
+  positivity
+
+theorem harmonic_isBigO_log : (fun x : ℝ ↦ (harmonic ⌊x⌋₊:ℝ)) =O[atTop] Real.log := by
+  trans (fun x ↦ 1 + Real.log x)
+  · apply Filter.Eventually.isBigO
+    filter_upwards [eventually_ge_atTop 1] with x hx
+    simp only [Rat.norm_cast_real, norm_eq_abs]
+    rw [abs_of_nonneg (mod_cast (harmonic_nonneg _))]
+    apply harmonic_floor_le_one_add_log _ hx
+  rw [IsBigO.add_iff_left (isBigO_refl ..)]
+  apply (Real.isLittleO_const_log_atTop).isBigO
+
+/- Note: really need the integral from 0, I think. -/
 theorem est_4 {σ : ℝ} (hσ : 0 < σ) :
-    ∑' n : ℕ, exp ((-σ) * n) * (n : ℝ)⁻¹ = σ * ∫ t in Set.Ioi 0, exp ((-σ) * t) * harmonic (⌊t⌋₊) := by
-
+    ∑' n : ℕ, exp ((-σ) * n) * (n : ℝ)⁻¹ = σ * ∫ t in Set.Ioi 1, exp ((-σ) * t) * harmonic (⌊t⌋₊) := by
   let c (n : ℕ) : ℝ := (n : ℝ)⁻¹
   let f (x : ℝ) := exp ((-σ) * x)
   let f' (x : ℝ) := (-σ) * exp ((-σ) * x)
-  let g (x : ℝ) := exp ((-σ) * x) * (Real.log x + 1)
+  let g (x : ℝ) := exp ((-σ) * x) * (Real.log x)
   have hf (x : ℝ) : HasDerivAt f (f' x) x := by
     simp only [f]
     convert (hasDerivAt_exp ((-σ) * x)).comp x ((hasDerivAt_id' x).const_mul (-σ)) using 1
     ring
-  have htends := tendsto_sum_mul_atTop_nhds_one_sub_integral₀ c (by norm_num) (f := f) ?hf_diff (l := 0) ?hf_int ?hlim (g := g) ?hbigO ?hg_int
+  have hc_sum (n : ℕ) : ∑ i ∈ Finset.Icc 0 n, c i = harmonic n := by
+    rw [harmonic_eq_sum_Icc, eq_comm]
+    simp [c]
+    apply Finset.sum_subset
+    · apply Finset.Icc_subset_Icc <;> norm_num
+    intro x hx hx'
+    simp only [inv_eq_zero, Nat.cast_eq_zero, f, c]
+    simp only [Finset.mem_Icc, zero_le, true_and, not_and, not_le, f, c] at hx hx'
+    omega
+  have hbigO_deriv : (fun t ↦ deriv f t * ∑ k ∈ Finset.Icc 0 ⌊t⌋₊, c k) =O[atTop] g := by
+    simp_rw [deriv_eq hf, f', g]
+    apply IsBigO.mul
+    · apply IsBigO.const_mul_left
+      exact isBigO_refl (fun x ↦ rexp (-σ * x)) atTop
+    · simp_rw [hc_sum]
+      exact harmonic_isBigO_log
+  have hbigO : (fun (t : ℝ) ↦ f t * ∑ k ∈ Finset.Icc 0 ⌊t⌋₊, c k) =O[atTop] g := by
+    have h : f =O[atTop] deriv f := by
+      simp_rw [deriv_eq hf, f, f']
+      apply IsBigO.const_mul_right
+      · linarith
+      exact isBigO_refl (fun x ↦ rexp (-σ * x)) atTop
+    apply IsBigO.trans _ hbigO_deriv
+    apply h.mul (isBigO_refl ..)
+  have hf_isBigO : f =O[atTop] (fun x ↦ x^(-7:ℝ)) := by
+    apply isLittleO_exp_neg_mul_rpow_atTop hσ (-7)|>.isBigO
+  have hg_isBigO : g =O[atTop] (fun x ↦ x ^ (-5:ℝ)) := by
+    have := isBigO_rpow_top_log_smul (show (5 : ℝ) < (7 : ℝ) by norm_num) hf_isBigO
+    apply this.congr'
+    · filter_upwards with x
+      simp only [neg_mul, smul_eq_mul, f, g, f']
+      ring
+    · exact Eq.eventuallyEq rfl
+  have htends := tendsto_sum_mul_atTop_nhds_one_sub_integral₀ c (by norm_num) (f := f) ?hf_diff (l := 0) ?hf_int ?hlim (g := g) hbigO_deriv ?hg_int
   case hf_diff =>
     intro t _
     apply (hf _).differentiableAt
@@ -483,35 +536,57 @@ theorem est_4 {σ : ℝ} (hσ : 0 < σ) :
     · exact continuousOn_const
     · exact isLocallyClosed_Ici
   case hlim =>
-    -- perhaps do the big-o statement first, then deduce this from that - it'll be easier to get an asymptotic estimate involving logs rather than harmonic sums.
-    sorry
-  case hbigO =>
-    simp_rw [deriv_eq hf, f', c]
-    sorry
+    convert (hbigO.trans_tendsto _).comp (tendsto_natCast_atTop_atTop) with n
+    · simp
+    apply hg_isBigO.trans_tendsto
+    refine tendsto_rpow_neg_atTop ?_
+    norm_num
   case hg_int =>
-    sorry
-
+    apply hg_isBigO.integrableAtFilter
+    · simp_rw [g]
+      apply (Measurable.stronglyMeasurable _).stronglyMeasurableAtFilter
+      fun_prop
+    · rw [integrableAtFilter_rpow_atTop_iff]
+      norm_num
   simp_rw [← Nat.range_succ_eq_Icc_zero] at htends
   have hsummable : Summable (fun n : ℕ ↦ f n * c n) := by
-    sorry
+    have : c =O[atTop] fun x ↦ (1:ℝ) := by
+      simp_rw [c, ← Real.rpow_neg_one]
+      apply IsBigO.natCast_atTop (f := fun x : ℝ ↦ x ^ _) (g := fun _ ↦ 1)
+      convert (isBigO_rpow_rpow_atTop_of_le (show -1 ≤ (0:ℝ) by norm_num)) using 1
+      simp
+    have := (hf_isBigO.natCast_atTop).mul this
+    apply summable_of_isBigO_nat _ this
+    simp only [mul_one, summable_nat_rpow, neg_lt_neg_iff, Nat.one_lt_ofNat, f', g, f]
   have := (Summable.tendsto_sum_tsum_nat hsummable).comp (tendsto_add_atTop_nat 1)
   simp only [f', f, c, Function.comp_def] at this
   have := tendsto_nhds_unique htends this
   rw [← this]
-  simp_rw [harmonic_eq_sum_Icc, c, deriv_eq hf, f']
+  simp_rw [harmonic_eq_sum_range_succ, c, deriv_eq hf, f']
   push_cast
-  sorry
-
+  simp only [neg_mul, zero_sub, g, f, f', c, ← MeasureTheory.integral_mul_left, ← MeasureTheory.integral_neg]
+  simp
+  congr 2 with t
+  ring
 
 theorem est_log_zeta :
-    (fun σ ↦ log (zeta (1 + σ)) - σ * ∫ t in Set.Ioi 1, exp (- σ * t) * harmonic (⌊t⌋₊)) =O[𝓝[>] 0] (fun σ ↦ σ) := by
-  sorry
+    (fun σ ↦ log (zeta (1 + σ)) - σ * ∫ t in Set.Ioi 1, exp (- σ * t) * harmonic (⌊t⌋₊)) =O[𝓝[>] 0]
+      (fun σ ↦ σ) := by
+  apply (est_1.triangle est_2.symm).congr'
+  · filter_upwards [eventually_mem_nhdsWithin] with x hx
+    simp only [Set.mem_Ioi] at hx
+    simp only [est_3, est_4, hx]
+  · rfl
 
 noncomputable def P (t : ℝ) : ℝ :=
   ∑ p ∈ Nat.primesBelow ⌊t⌋₊, (p : ℝ)⁻¹
 
 theorem est_P {σ : ℝ} (hσ : 0 < σ) :
-    ∑' p : Nat.Primes, (p : ℝ)⁻¹ ^(1+σ) = σ * ∫ t in Set.Ioi 0, exp (- σ * t) * P (exp t) := by
+    ∑' p : Nat.Primes, (p : ℝ)⁻¹ ^(1+σ) = σ * ∫ t in Set.Ioi 1, exp ((-σ) * t) * P (exp t) := by
+  let c (n : ℕ) : ℝ := if n.Prime then (n : ℝ)⁻¹ else 0
+  let f (x : ℝ) := x ^ (-σ)
+  let f' (x : ℝ) := (-σ) * x ^ (-σ - 1)
+  let g (x : ℝ) := x ^ (-σ-1) * (Real.log x)
   sorry
 
 theorem est_f :
