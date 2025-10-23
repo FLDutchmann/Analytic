@@ -7,7 +7,6 @@ open scoped Filter
 
 noncomputable def zeta (x : ℝ) : ℝ := (riemannZeta x).re
 
-
 theorem Complex.im_tsum_eq_zero {ι : Type*} {f : ι → ℂ} (hf : ∑' n, (f n).im = 0) :
     (∑' n, f n).im = 0 := by
   by_cases hf' : Summable f
@@ -579,14 +578,163 @@ theorem est_log_zeta :
   · rfl
 
 noncomputable def P (t : ℝ) : ℝ :=
-  ∑ p ∈ Nat.primesBelow ⌊t⌋₊, (p : ℝ)⁻¹
+  ∑ p ∈ Nat.primesBelow (⌊t⌋₊ + 1), (p : ℝ)⁻¹
+
+theorem P_eq : P = (fun t ↦ ∑ p ∈ Nat.primesBelow (⌊t⌋₊ + 1), (p : ℝ)⁻¹) := rfl
+
+theorem P_mono {x y : ℝ} (hxy : x ≤ y) : P x ≤ P y := by
+  simp [P, Nat.primesBelow]
+  gcongr
+
+theorem P_nonneg (x : ℝ) : 0 ≤ P x := by
+  simp [P]
+  positivity
+
+theorem P_isBigO_log : P =O[atTop] log := by
+  trans (fun t ↦ (harmonic ⌊t⌋₊))
+  · simp [P_eq, Nat.primesBelow, harmonic_eq_sum_Icc]
+    apply IsBigO.of_bound'
+    filter_upwards with x
+    simp only [norm_eq_abs]
+    rw [abs_of_nonneg (by positivity), abs_of_nonneg (by positivity)]
+    gcongr
+    intro p; simp
+    intro hp hpp
+    refine ⟨hpp.one_le, by omega⟩
+  · exact harmonic_isBigO_log
+
+theorem MeasureTheory.LocallyIntegrableOn.congr_on {X : Type*} {E : Type*} [MeasurableSpace X] [TopologicalSpace X] [TopologicalSpace E] [ContinuousENorm E] [NormedAddCommGroup E] {f g : X → E} {s : Set X} {μ : MeasureTheory.Measure X} (hfg : s.EqOn f g) (hf : LocallyIntegrableOn f s μ) : LocallyIntegrableOn g s μ  := by
+  -- rw [MeasureTheory.IntegrableOn.eq_1] at hf ⊢
+  sorry
+
+theorem tsum_primes {f : ℕ → ℝ} : ∑' p : Nat.Primes, f p = ∑' n : ℕ, if n.Prime then f n else 0 := by
+  simp_rw [Nat.Primes]
+  -- have := show ({p // Nat.Prime p}) = ({p | Nat.Prime p} : Set ℕ) by sorry
+  erw [tsum_subtype]
+  classical
+  simp [Set.indicator_apply]
+  congr with x
+  have : Irreducible x ↔ Nat.Prime x := by
+    sorry
+
+
+
+
+
+
+
+  sorry
 
 theorem est_P {σ : ℝ} (hσ : 0 < σ) :
-    ∑' p : Nat.Primes, (p : ℝ)⁻¹ ^(1+σ) = σ * ∫ t in Set.Ioi 1, exp ((-σ) * t) * P (exp t) := by
+    ∑' p : Nat.Primes, (p : ℝ)⁻¹ ^(1+σ) = σ * ∫ t in Set.Ioi 1, t ^ (-σ - 1) * P t := by
   let c (n : ℕ) : ℝ := if n.Prime then (n : ℝ)⁻¹ else 0
   let f (x : ℝ) := x ^ (-σ)
   let f' (x : ℝ) := (-σ) * x ^ (-σ - 1)
+  have hf' {x : ℝ} (hx : x ≠ 0) : HasDerivAt f (f' x) x := by
+    simp_rw [f, f']
+    apply Real.hasDerivAt_rpow_const (p := -σ)
+    simp [hx]
+  have hderiv_f : (Set.Ici (1:ℝ)).EqOn (deriv f) f' := by
+    intro x hx
+    simp only [Set.mem_Ici, f', f] at hx
+    rw [hf' (by linarith) |>.deriv]
+  -- have deriv_f_eq : deriv f = f' := by
+  --   simp [f, f']
+  --   · simp [hx, f, f']
+
+  --     sorry
+  --   sorry
   let g (x : ℝ) := x ^ (-σ-1) * (Real.log x)
+  have g_isBigO : (fun x ↦ g x) =O[atTop] (fun x ↦ x ^ (-σ/2 - 1)) := by
+    sorry
+  have hc_sum (n : ℕ) : ∑ i ∈ Finset.Icc 0 n, c i = P n := by
+    simp [P, c, ← Finset.sum_filter]
+    congr
+    exact (Nat.range_succ_eq_Icc_zero n).symm
+
+              -- tendsto_sum_mul_atTop_nhds_one_sub_integral
+  have htends := tendsto_sum_mul_atTop_nhds_one_sub_integral₀ c (by simp [c]) (f := f) ?hf_diff (l := 0) ?hf_int ?hlim (g := g) ?isBigO_g ?hg_int
+  case isBigO_g =>
+    simp_rw [g, hc_sum]
+    calc
+      _ =ᶠ[atTop] (fun x ↦ f' x * P (⌊x⌋₊)) := by
+        filter_upwards [eventually_ne_atTop 0] with x hx
+        congr
+        rw [(hf' hx).deriv]
+      _ =O[atTop] _ := by
+        apply IsBigO.mul
+        · simp [f']
+          apply IsBigO.of_bound σ
+          simp [abs_of_pos hσ]
+        · trans P
+          · apply IsBigO.of_bound'
+            simp [abs_of_nonneg, P_nonneg]
+            use 0
+            intro x hx
+            apply P_mono
+            exact Nat.floor_le hx
+          exact P_isBigO_log
+  case hf_diff =>
+    simp only [Set.mem_Ici]
+    intro t ht
+    apply (hf' _).differentiableAt
+    linarith
+  case hf_int =>
+    apply MeasureTheory.LocallyIntegrableOn.congr_on hderiv_f.symm
+    simp [f']
+    apply ContinuousOn.locallyIntegrableOn
+    · apply ContinuousOn.neg
+      apply ContinuousOn.mul
+      · exact continuousOn_const
+      apply ContinuousOn.rpow
+      · exact continuousOn_id' (Set.Ici 1)
+      · exact continuousOn_const
+      · simp +contextual
+        intro x hx
+        left
+        linarith
+    measurability
+  case hlim =>
+    have hisBigO_log_smul : (fun n : ℕ ↦ f n * ∑ i ∈ Finset.Icc 0 n, c i) =O[atTop]  (fun t ↦ log t • (t:ℝ)^(-σ)) := by
+      simp
+      conv =>
+        enter [2, n]
+        rw [mul_comm]
+      apply IsBigO.mul
+      · simp_rw [hc_sum]
+        apply P_isBigO_log.natCast_atTop
+      · apply isBigO_refl
+    have hf : f =O[atTop] (fun t ↦ t ^ (- σ)) := isBigO_refl ..
+
+    -- by simp [f]; apply IsBigO.rfl
+    have := isBigO_rpow_top_log_smul (b := σ / 2) (a := σ) (by linarith) hf
+    have := hisBigO_log_smul.trans (this.natCast_atTop) |>.trans_tendsto
+    apply this
+    apply tendsto_rpow_neg_atTop (by linarith) |>.comp tendsto_natCast_atTop_atTop
+  case hg_int =>
+    apply g_isBigO.integrableAtFilter (μ := MeasureTheory.volume)
+    · simp [g]
+      apply MeasureTheory.StronglyMeasurable.stronglyMeasurableAtFilter
+      apply Measurable.stronglyMeasurable
+      fun_prop
+    rw [integrableAtFilter_rpow_atTop_iff]
+    linarith
+  simp_rw [hc_sum] at htends
+-- [2](https://leanprover-community.github.io/mathlib4_docs/Mathlib/Topology/Algebra/InfiniteSum/NatInt.html#Summable.tendsto_sum_tsum_nat)
+  have {n : ℕ} : f n * c n = if n.Prime then (n : ℝ)^(-σ-1) else 0 := by
+    simp_rw [f, c]
+    split_ifs with h
+    · rw [← rpow_neg_one, ← rpow_add]
+      · ring_nf
+      · norm_cast
+        apply h.pos
+    · simp
+  simp_rw [← Nat.range_succ_eq_Icc_zero, this] at htends
+  sorry
+
+#check MeasureTheory.integral_comp_mul_deriv_Ioi
+theorem est_P_rexp {σ : ℝ} (hσ : 0 < σ) :
+    ∑' p : Nat.Primes, (p : ℝ)⁻¹ ^(1+σ) = σ * ∫ t in Set.Ioi 0, exp ((-σ) * t) * P (exp t) := by
   sorry
 
 theorem est_f :
