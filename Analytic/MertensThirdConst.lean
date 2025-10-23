@@ -100,7 +100,7 @@ theorem Real.multipliable_zeta (x : ℝ) (hx : 1 < x) :
     ext p
     simp only [Complex.ofReal_inv, Complex.ofReal_sub, Complex.ofReal_one, inv_inj, sub_right_inj]
     rw [Complex.ofReal_cpow] <;> simp
-  simp only [this, ←Complex.multipliable_iff_ofReal, Nat.cast_nonneg] at hprod
+  simp only [this, ←Complex.multipliable_iff_ofReal] at hprod
   apply hprod
 
 theorem Real.zeta_eulerProd (x : ℝ) (hx : 1 < x) :
@@ -140,7 +140,7 @@ theorem zeta_pole_estimate_nhdsWithin :
     have := this.comp_tendsto (add_zero (1:ℂ) ▸ (continuous_add_left (1:ℂ)).tendsto 0)
     simpa only [one_div, Function.comp_def, add_sub_cancel_left] using this
   have := this.comp_tendsto (Complex.continuous_ofReal.tendsto _)
-  simp only [one_div, Function.comp_def] at this
+  simp only [Function.comp_def] at this
   apply (this.re.mono nhdsWithin_le_nhds).congr'
   · filter_upwards with σ
     simp only [Function.comp_apply, Complex.sub_re, Complex.inv_re, Complex.ofReal_re,
@@ -167,7 +167,7 @@ private noncomputable def f (σ : ℝ) : ℝ :=
   ∑' p : Nat.Primes, (log ((1 - (p:ℝ)^(-(1+σ)))⁻¹) - (p : ℝ)^(-(1+σ)))
 
 theorem f_def' {σ : ℝ} (hσ : 0 < σ) : f σ = log (zeta (1+σ)) - ∑' (p : Nat.Primes), (p:ℝ) ^ (-(1+σ)) := by
-  rw [f, tsum_sub, Real.log_zeta hσ]
+  rw [f, Summable.tsum_sub, Real.log_zeta hσ]
   · apply hasSum_log_zeta hσ |>.summable
   · have := Real.summable_nat_rpow (p := -(1 + σ)) |>.mpr (by linarith)
     apply this.subtype Nat.Prime
@@ -254,7 +254,7 @@ theorem f_continuousOn : ContinuousOn f (Set.Ici 0) := by
     · simpa using hσ
 
 theorem f_zero : f 0 = M := by
-  simp [f_eq_tsum_tsum _ le_rfl, M, rpow_neg, tsum_subtype]
+  simp [f_eq_tsum_tsum _ le_rfl, M, rpow_neg]
   trans ∑' p : {n : ℕ | n.Prime}, ∑' n : ℕ, ((p:ℕ)^(n+2):ℝ)⁻¹/(n+2)
   · rfl
   rw [tsum_subtype {n : ℕ | n.Prime} (fun k ↦ ∑' n : ℕ, (((k:ℝ)^(n+2))⁻¹/(n+2))) ]
@@ -265,7 +265,7 @@ theorem log_add_id_IsBigO_nhdsWithin_id :
   rw [Asymptotics.isBigO_iff']
   refine ⟨2, by norm_num, ?_⟩
   filter_upwards [eventually_abs_sub_lt 0 (show 0 < 1/2 by norm_num)] with x hx
-  simp only [Set.mem_Ioi, norm_eq_abs] at ⊢ hx
+  simp only [norm_eq_abs] at ⊢ hx
   simp only [sub_zero, one_div] at hx
   have h := Real.abs_log_sub_add_sum_range_le (x := -x) (by simp only [abs_neg]; linarith) 0
   simp only [Finset.range_zero, Finset.sum_empty, sub_neg_eq_add, zero_add, abs_neg,
@@ -388,7 +388,7 @@ theorem inv_sub_pow_isBigO {f : ℝ → ℝ} {a b : ℝ} (hb : a < b) (hf : (fun
       simp only [Set.mem_Ioi] at hx
       rw [← Real.rpow_add hx]
       ring_nf
-  simp [mul_inv_rev, rpow_neg] at this
+  simp [mul_inv_rev] at this
   apply this.mul (isBigO_refl (fun x ↦ x ^ (-a)) _) |>.congr'
   · filter_upwards [eventually_mem_nhdsWithin] with x hx
     simp only [Set.mem_Ioi] at hx
@@ -405,7 +405,7 @@ theorem extracted_1 : (fun x ↦ 1 - rexp (-x) - x ^ 1) =O[𝓝 0] fun x ↦ x ^
   have := Real.exp_sub_sum_range_isBigO_pow 2 |>.neg_left
   simp only [Finset.sum_range_succ, Finset.range_one, Finset.sum_singleton, pow_zero,
     Nat.factorial_zero, Nat.cast_one, ne_eq, one_ne_zero, not_false_eq_true, div_self, pow_one,
-    Nat.factorial_one, div_one, Nat.factorial_two, Nat.cast_ofNat] at this
+    Nat.factorial_one, div_one] at this
   have ht : Tendsto (fun x : ℝ ↦ -x) (𝓝 0) (𝓝 0) := by
     convert continuous_neg.tendsto (0:ℝ)
     simp
@@ -472,7 +472,7 @@ theorem harmonic_isBigO_log : (fun x : ℝ ↦ (harmonic ⌊x⌋₊:ℝ)) =O[atT
   trans (fun x ↦ 1 + Real.log x)
   · apply Filter.Eventually.isBigO
     filter_upwards [eventually_ge_atTop 1] with x hx
-    simp only [Rat.norm_cast_real, norm_eq_abs]
+    simp only [norm_eq_abs]
     rw [abs_of_nonneg (mod_cast (harmonic_nonneg _))]
     apply harmonic_floor_le_one_add_log _ hx
   rw [IsBigO.add_iff_left (isBigO_refl ..)]
@@ -495,8 +495,8 @@ theorem est_4 {σ : ℝ} (hσ : 0 < σ) :
     apply Finset.sum_subset
     · apply Finset.Icc_subset_Icc <;> norm_num
     intro x hx hx'
-    simp only [inv_eq_zero, Nat.cast_eq_zero, f, c]
-    simp only [Finset.mem_Icc, zero_le, true_and, not_and, not_le, f, c] at hx hx'
+    simp only [inv_eq_zero, Nat.cast_eq_zero]
+    simp only [Finset.mem_Icc, zero_le, true_and, not_and, not_le] at hx hx'
     omega
   have hbigO_deriv : (fun t ↦ deriv f t * ∑ k ∈ Finset.Icc 0 ⌊t⌋₊, c k) =O[atTop] g := by
     simp_rw [deriv_eq hf, f', g]
@@ -519,7 +519,7 @@ theorem est_4 {σ : ℝ} (hσ : 0 < σ) :
     have := isBigO_rpow_top_log_smul (show (5 : ℝ) < (7 : ℝ) by norm_num) hf_isBigO
     apply this.congr'
     · filter_upwards with x
-      simp only [neg_mul, smul_eq_mul, f, g, f']
+      simp only [neg_mul, smul_eq_mul, f, g]
       ring
     · exact Eq.eventuallyEq rfl
   have htends := tendsto_sum_mul_atTop_nhds_one_sub_integral₀ c (by norm_num) (f := f) ?hf_diff (l := 0) ?hf_int ?hlim (g := g) hbigO_deriv ?hg_int
@@ -556,14 +556,14 @@ theorem est_4 {σ : ℝ} (hσ : 0 < σ) :
       simp
     have := (hf_isBigO.natCast_atTop).mul this
     apply summable_of_isBigO_nat _ this
-    simp only [mul_one, summable_nat_rpow, neg_lt_neg_iff, Nat.one_lt_ofNat, f', g, f]
+    simp only [mul_one, summable_nat_rpow, neg_lt_neg_iff, Nat.one_lt_ofNat]
   have := (Summable.tendsto_sum_tsum_nat hsummable).comp (tendsto_add_atTop_nat 1)
-  simp only [f', f, c, Function.comp_def] at this
+  simp only [f, c, Function.comp_def] at this
   have := tendsto_nhds_unique htends this
   rw [← this]
   simp_rw [harmonic_eq_sum_range_succ, c, deriv_eq hf, f']
   push_cast
-  simp only [neg_mul, zero_sub, g, f, f', c, ← MeasureTheory.integral_mul_left, ← MeasureTheory.integral_neg]
+  simp only [neg_mul, zero_sub, ← MeasureTheory.integral_const_mul, ← MeasureTheory.integral_neg]
   simp
   congr 2 with t
   ring

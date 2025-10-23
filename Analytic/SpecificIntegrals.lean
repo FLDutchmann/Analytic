@@ -72,7 +72,7 @@ theorem integrable_inv_mul_log_inv_Icc (a b : ℝ) (ha : 1 < a):
   apply ((continuousOn_inv₀.mono hsub).mul ((continuousOn_log.mono hsub).inv₀ ?_))
     |>.integrableOn_compact isCompact_Icc
   intro x
-  simp only [Set.mem_Icc, ne_eq, not_or, and_imp]
+  simp only [Set.mem_Icc, ne_eq, and_imp]
   -- bound
   intro hx _
   apply (Real.log_pos (by linarith)).ne.symm
@@ -82,7 +82,7 @@ theorem integral_inv_mul_invlog (a b : ℝ) (ha : 1 < a) (hb : a ≤ b) :
       Real.log (Real.log b) - Real.log (Real.log a) := by
   have hsub : Set.uIcc (3 / 2) b ⊆ {0}ᶜ := by
     simp only [Set.subset_compl_singleton_iff]
-    refine Set.not_mem_uIcc_of_lt (by norm_num) (by linarith)
+    refine Set.notMem_uIcc_of_lt (by norm_num) (by linarith)
   have htzero : b ≠ 0 := by linarith
   have hlogzero : Real.log b ≠ 0 := (Real.log_pos (by linarith)).ne.symm
   rw [← intervalIntegral.integral_of_le hb]

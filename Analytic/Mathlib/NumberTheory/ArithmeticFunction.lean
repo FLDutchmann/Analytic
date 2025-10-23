@@ -1,7 +1,6 @@
 import Mathlib.NumberTheory.ArithmeticFunction
 
-
-open Nat ArithmeticFunction
+open Nat ArithmeticFunction zeta
 
 theorem ArithmeticFunction.sum_range_mul_zeta
     {R : Type*} [Semiring R] (f : ArithmeticFunction R) (N : ℕ) :
@@ -13,7 +12,7 @@ theorem ArithmeticFunction.sum_range_mul_zeta
     simp_rw [Nat.succ_div, add_smul, Finset.sum_add_distrib, h_ind]
     congr 1
     · apply Finset.sum_subset
-      · refine Finset.range_subset.mpr (le_succ _)
+      · grind
       · simp only [Finset.mem_range, not_lt, nsmul_eq_mul]
         intro d hd1 hd2
         obtain rfl : d = n+1 := by omega
